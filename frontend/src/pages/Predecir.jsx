@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import axios from 'axios'
-import { Search, AlertCircle, CheckCircle2, Upload, FileText } from 'lucide-react'
+import { Search, AlertCircle, CheckCircle2, Upload, FileText, File as FileIcon } from 'lucide-react'
 
 export default function Predecir() {
   const [texto, setTexto]         = useState('')
@@ -8,10 +8,19 @@ export default function Predecir() {
   const [cargando, setCargando]   = useState(false)
   const [error, setError]         = useState('')
   const [archivo, setArchivo]     = useState(null)
+  const [esBinario, setEsBinario] = useState(false)
+
+  const esPDFoDOCX = (name) => /\.(pdf|docx)$/i.test(name)
 
   const leerArchivo = (file) => {
     setArchivo(file)
     setError('')
+    const esBin = esPDFoDOCX(file.name)
+    setEsBinario(esBin)
+    if (esBin) {
+      setTexto('')
+      return
+    }
     const reader = new FileReader()
     reader.onload = (e) => setTexto(e.target.result)
     reader.readAsText(file, 'UTF-8')
@@ -29,15 +38,24 @@ export default function Predecir() {
   }
 
   const analizar = async () => {
-    if (!texto.trim()) {
-      setError('Por favor ingresa o sube el texto del CV')
+    if (!archivo && !texto.trim()) {
+      setError('Por favor sube un archivo o ingresa el texto del CV')
       return
     }
     setError('')
     setCargando(true)
     setResultado(null)
     try {
-      const res = await axios.post('http://127.0.0.1:5000/predecir', { resume: texto })
+      let res
+      if (archivo && esBinario) {
+        const fd = new FormData()
+        fd.append('file', archivo)
+        res = await axios.post('http://127.0.0.1:5000/predecir', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
+      } else {
+        res = await axios.post('http://127.0.0.1:5000/predecir', { resume: texto })
+      }
       setResultado(res.data)
     } catch {
       setError('Error al conectar con el servidor. Verifica que el backend esté corriendo.')
@@ -51,6 +69,7 @@ export default function Predecir() {
     setResultado(null)
     setError('')
     setArchivo(null)
+    setEsBinario(false)
   }
 
   const confianzaColor = (c) => {
@@ -76,11 +95,11 @@ export default function Predecir() {
           <p className="text-sm text-gray-600 font-medium">
             Arrastra un archivo aquí o <span className="text-blue-600 underline">haz clic para subir</span>
           </p>
-          <p className="text-xs text-gray-400 mt-1">Formatos: .txt, .csv (el texto se cargará automáticamente)</p>
+          <p className="text-xs text-gray-400 mt-1">Formatos: .pdf, .docx, .txt</p>
           <input
             id="fileInput"
             type="file"
-            accept=".txt,.csv"
+            accept=".pdf,.docx,.txt"
             className="hidden"
             onChange={onFileInput}
           />
@@ -89,22 +108,25 @@ export default function Predecir() {
         {/* Archivo cargado */}
         {archivo && (
           <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2 mb-4">
-            <FileText size={16} className="text-green-600"/>
+            {esBinario ? <FileIcon size={16} className="text-green-600"/> : <FileText size={16} className="text-green-600"/>}
             <span className="text-sm text-green-700 font-medium">{archivo.name}</span>
-            <span className="text-xs text-green-500 ml-auto">Cargado ✓</span>
+            <span className="text-xs text-green-500 ml-auto">
+              {esBinario ? 'Se enviará al servidor ✓' : 'Texto cargado ✓'}
+            </span>
           </div>
         )}
 
-        {/* Textarea */}
+        {/* Textarea — solo habilitado si no hay archivo binario */}
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          O pega el texto del currículo aquí
+          {esBinario ? 'El contenido del archivo binario se extraerá en el servidor' : 'O pega el texto del currículo aquí'}
         </label>
         <textarea
           value={texto}
           onChange={e => setTexto(e.target.value)}
           rows={8}
-          placeholder="Escribe o pega el contenido del CV aquí..."
-          className="w-full border border-gray-300 rounded-lg p-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          disabled={esBinario}
+          placeholder={esBinario ? 'Deshabilita el archivo para escribir texto manualmente' : 'Escribe o pega el contenido del CV aquí...'}
+          className={`w-full border border-gray-300 rounded-lg p-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${esBinario ? 'bg-gray-100 cursor-not-allowed' : ''}`}
         />
 
         {error && (
