@@ -1,0 +1,176 @@
+import { useState } from 'react'
+import axios from 'axios'
+import { Search, AlertCircle, CheckCircle2, Upload, FileText } from 'lucide-react'
+
+export default function Predecir() {
+  const [texto, setTexto]         = useState('')
+  const [resultado, setResultado] = useState(null)
+  const [cargando, setCargando]   = useState(false)
+  const [error, setError]         = useState('')
+  const [archivo, setArchivo]     = useState(null)
+
+  const leerArchivo = (file) => {
+    setArchivo(file)
+    setError('')
+    const reader = new FileReader()
+    reader.onload = (e) => setTexto(e.target.result)
+    reader.readAsText(file, 'UTF-8')
+  }
+
+  const onDrop = (e) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files[0]
+    if (file) leerArchivo(file)
+  }
+
+  const onFileInput = (e) => {
+    const file = e.target.files[0]
+    if (file) leerArchivo(file)
+  }
+
+  const analizar = async () => {
+    if (!texto.trim()) {
+      setError('Por favor ingresa o sube el texto del CV')
+      return
+    }
+    setError('')
+    setCargando(true)
+    setResultado(null)
+    try {
+      const res = await axios.post('http://127.0.0.1:5000/predecir', { resume: texto })
+      setResultado(res.data)
+    } catch {
+      setError('Error al conectar con el servidor. Verifica que el backend esté corriendo.')
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  const limpiar = () => {
+    setTexto('')
+    setResultado(null)
+    setError('')
+    setArchivo(null)
+  }
+
+  const confianzaColor = (c) => {
+    if (c >= 80) return 'bg-green-500'
+    if (c >= 50) return 'bg-yellow-500'
+    return 'bg-red-500'
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">Analizar CV</h1>
+
+      <div className="bg-white rounded-xl shadow p-6 mb-6">
+
+        {/* Zona de drop */}
+        <div
+          onDrop={onDrop}
+          onDragOver={e => e.preventDefault()}
+          className="border-2 border-dashed border-blue-300 rounded-lg p-6 text-center mb-4 hover:border-blue-500 transition cursor-pointer bg-blue-50"
+          onClick={() => document.getElementById('fileInput').click()}
+        >
+          <Upload className="mx-auto text-blue-400 mb-2" size={32}/>
+          <p className="text-sm text-gray-600 font-medium">
+            Arrastra un archivo aquí o <span className="text-blue-600 underline">haz clic para subir</span>
+          </p>
+          <p className="text-xs text-gray-400 mt-1">Formatos: .txt, .csv (el texto se cargará automáticamente)</p>
+          <input
+            id="fileInput"
+            type="file"
+            accept=".txt,.csv"
+            className="hidden"
+            onChange={onFileInput}
+          />
+        </div>
+
+        {/* Archivo cargado */}
+        {archivo && (
+          <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2 mb-4">
+            <FileText size={16} className="text-green-600"/>
+            <span className="text-sm text-green-700 font-medium">{archivo.name}</span>
+            <span className="text-xs text-green-500 ml-auto">Cargado ✓</span>
+          </div>
+        )}
+
+        {/* Textarea */}
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          O pega el texto del currículo aquí
+        </label>
+        <textarea
+          value={texto}
+          onChange={e => setTexto(e.target.value)}
+          rows={8}
+          placeholder="Escribe o pega el contenido del CV aquí..."
+          className="w-full border border-gray-300 rounded-lg p-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+        />
+
+        {error && (
+          <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
+            <AlertCircle size={16}/> {error}
+          </div>
+        )}
+
+        <div className="flex gap-3 mt-4">
+          <button
+            onClick={analizar}
+            disabled={cargando}
+            className="flex items-center gap-2 bg-blue-800 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50"
+          >
+            <Search size={18}/>
+            {cargando ? 'Analizando...' : 'Analizar CV'}
+          </button>
+          <button
+            onClick={limpiar}
+            className="px-6 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition"
+          >
+            Limpiar
+          </button>
+        </div>
+      </div>
+
+      {/* Resultado */}
+      {resultado && (
+        <div className="bg-white rounded-xl shadow p-6 border-l-4 border-green-500">
+          <div className="flex items-center gap-2 mb-4">
+            <CheckCircle2 className="text-green-500" size={24}/>
+            <h2 className="text-lg font-bold text-gray-800">Resultado del análisis</h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-blue-50 rounded-lg p-4 text-center">
+              <p className="text-sm text-gray-500 mb-1">Categoría detectada</p>
+              <p className="text-xl font-bold text-blue-800">{resultado.categoria}</p>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4 text-center">
+              <p className="text-sm text-gray-500 mb-1">Nivel de confianza</p>
+              <p className="text-xl font-bold text-green-700">{resultado.confianza}%</p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="flex justify-between text-xs text-gray-500 mb-1">
+              <span>Confianza del modelo</span>
+              <span>{resultado.confianza}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div
+                className={`${confianzaColor(resultado.confianza)} h-3 rounded-full transition-all duration-700`}
+                style={{ width: `${resultado.confianza}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              {resultado.confianza >= 80 ? '🟢 Alta confianza' : resultado.confianza >= 50 ? '🟡 Confianza media' : '🔴 Baja confianza'}
+            </p>
+          </div>
+
+          <p className="text-xs text-gray-400 mt-4">
+            * Modelo Random Forest entrenado con más de 2,400 currículos reales
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
