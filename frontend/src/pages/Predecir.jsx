@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import axios from 'axios'
-import { Search, AlertCircle, CheckCircle2, Upload, FileText, File as FileIcon } from 'lucide-react'
+import api from '../api'
+import { Search, AlertCircle, CheckCircle2, Upload, FileText, File as FileIcon, History } from 'lucide-react'
 
-export default function Predecir() {
+export default function Predecir({ setPagina }) {
   const [texto, setTexto]         = useState('')
   const [resultado, setResultado] = useState(null)
   const [cargando, setCargando]   = useState(false)
@@ -15,12 +15,10 @@ export default function Predecir() {
   const leerArchivo = (file) => {
     setArchivo(file)
     setError('')
+    setResultado(null)
     const esBin = esPDFoDOCX(file.name)
     setEsBinario(esBin)
-    if (esBin) {
-      setTexto('')
-      return
-    }
+    if (esBin) { setTexto(''); return }
     const reader = new FileReader()
     reader.onload = (e) => setTexto(e.target.result)
     reader.readAsText(file, 'UTF-8')
@@ -39,7 +37,7 @@ export default function Predecir() {
 
   const analizar = async () => {
     if (!archivo && !texto.trim()) {
-      setError('Por favor sube un archivo o ingresa el texto del CV')
+      setError('Sube un archivo o ingresa el texto del CV')
       return
     }
     setError('')
@@ -50,26 +48,27 @@ export default function Predecir() {
       if (archivo && esBinario) {
         const fd = new FormData()
         fd.append('file', archivo)
-        res = await axios.post('http://127.0.0.1:5000/predecir', fd, {
+        res = await api.post('/api/predecir', fd, {
           headers: { 'Content-Type': 'multipart/form-data' }
         })
       } else {
-        res = await axios.post('http://127.0.0.1:5000/predecir', { resume: texto })
+        res = await api.post('/api/predecir', { resume: texto })
       }
       setResultado(res.data)
-    } catch {
-      setError('Error al conectar con el servidor. Verifica que el backend esté corriendo.')
+    } catch (err) {
+      if (err.response?.status === 401) {
+        setError('Sesión expirada. Inicia sesión nuevamente.')
+      } else {
+        setError('Error al conectar con el servidor.')
+      }
     } finally {
       setCargando(false)
     }
   }
 
   const limpiar = () => {
-    setTexto('')
-    setResultado(null)
-    setError('')
-    setArchivo(null)
-    setEsBinario(false)
+    setTexto(''); setResultado(null); setError('')
+    setArchivo(null); setEsBinario(false)
   }
 
   const confianzaColor = (c) => {
@@ -83,8 +82,6 @@ export default function Predecir() {
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Analizar CV</h1>
 
       <div className="bg-white rounded-xl shadow p-6 mb-6">
-
-        {/* Zona de drop */}
         <div
           onDrop={onDrop}
           onDragOver={e => e.preventDefault()}
@@ -96,16 +93,10 @@ export default function Predecir() {
             Arrastra un archivo aquí o <span className="text-blue-600 underline">haz clic para subir</span>
           </p>
           <p className="text-xs text-gray-400 mt-1">Formatos: .pdf, .docx, .txt</p>
-          <input
-            id="fileInput"
-            type="file"
-            accept=".pdf,.docx,.txt"
-            className="hidden"
-            onChange={onFileInput}
-          />
+          <input id="fileInput" type="file" accept=".pdf,.docx,.txt"
+            className="hidden" onChange={onFileInput}/>
         </div>
 
-        {/* Archivo cargado */}
         {archivo && (
           <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2 mb-4">
             {esBinario ? <FileIcon size={16} className="text-green-600"/> : <FileText size={16} className="text-green-600"/>}
@@ -116,18 +107,13 @@ export default function Predecir() {
           </div>
         )}
 
-        {/* Textarea — solo habilitado si no hay archivo binario */}
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          {esBinario ? 'El contenido del archivo binario se extraerá en el servidor' : 'O pega el texto del currículo aquí'}
+          {esBinario ? 'El contenido se extraerá en el servidor' : 'O pega el texto del currículo aquí'}
         </label>
-        <textarea
-          value={texto}
-          onChange={e => setTexto(e.target.value)}
-          rows={8}
-          disabled={esBinario}
-          placeholder={esBinario ? 'Deshabilita el archivo para escribir texto manualmente' : 'Escribe o pega el contenido del CV aquí...'}
-          className={`w-full border border-gray-300 rounded-lg p-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${esBinario ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-        />
+        <textarea value={texto} onChange={e => setTexto(e.target.value)}
+          rows={8} disabled={esBinario}
+          placeholder={esBinario ? 'Desmarca el archivo para escribir texto manualmente' : 'Escribe o pega el contenido del CV aquí...'}
+          className={`w-full border border-gray-300 rounded-lg p-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${esBinario ? 'bg-gray-100 cursor-not-allowed' : ''}`}/>
 
         {error && (
           <div className="flex items-center gap-2 text-red-600 text-sm mt-2">
@@ -136,24 +122,18 @@ export default function Predecir() {
         )}
 
         <div className="flex gap-3 mt-4">
-          <button
-            onClick={analizar}
-            disabled={cargando}
-            className="flex items-center gap-2 bg-blue-800 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50"
-          >
+          <button onClick={analizar} disabled={cargando}
+            className="flex items-center gap-2 bg-blue-800 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50">
             <Search size={18}/>
             {cargando ? 'Analizando...' : 'Analizar CV'}
           </button>
-          <button
-            onClick={limpiar}
-            className="px-6 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition"
-          >
+          <button onClick={limpiar}
+            className="px-6 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition">
             Limpiar
           </button>
         </div>
       </div>
 
-      {/* Resultado */}
       {resultado && (
         <div className="bg-white rounded-xl shadow p-6 border-l-4 border-green-500">
           <div className="flex items-center gap-2 mb-4">
@@ -161,14 +141,18 @@ export default function Predecir() {
             <h2 className="text-lg font-bold text-gray-800">Resultado del análisis</h2>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="bg-blue-50 rounded-lg p-4 text-center">
               <p className="text-sm text-gray-500 mb-1">Categoría detectada</p>
               <p className="text-xl font-bold text-blue-800">{resultado.categoria}</p>
             </div>
             <div className="bg-green-50 rounded-lg p-4 text-center">
-              <p className="text-sm text-gray-500 mb-1">Nivel de confianza</p>
+              <p className="text-sm text-gray-500 mb-1">Confianza</p>
               <p className="text-xl font-bold text-green-700">{resultado.confianza}%</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4 text-center">
+              <p className="text-sm text-gray-500 mb-1">Caracteres</p>
+              <p className="text-xl font-bold text-gray-700">{resultado.caracteres?.toLocaleString()}</p>
             </div>
           </div>
 
@@ -178,19 +162,28 @@ export default function Predecir() {
               <span>{resultado.confianza}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3">
-              <div
-                className={`${confianzaColor(resultado.confianza)} h-3 rounded-full transition-all duration-700`}
-                style={{ width: `${resultado.confianza}%` }}
-              />
+              <div className={`${confianzaColor(resultado.confianza)} h-3 rounded-full transition-all duration-700`}
+                style={{ width: `${resultado.confianza}%` }}/>
             </div>
             <p className="text-xs text-gray-400 mt-1">
-              {resultado.confianza >= 80 ? '🟢 Alta confianza' : resultado.confianza >= 50 ? '🟡 Confianza media' : '🔴 Baja confianza'}
+              {resultado.confianza >= 80 ? 'Alta confianza' : resultado.confianza >= 50 ? 'Confianza media' : 'Baja confianza'}
             </p>
           </div>
 
-          <p className="text-xs text-gray-400 mt-4">
-            * Modelo Random Forest entrenado con más de 2,400 currículos reales
-          </p>
+          {resultado.id_analisis && (
+            <p className="text-xs text-gray-400 mt-3">ID de análisis: #{resultado.id_analisis}</p>
+          )}
+
+          <div className="mt-4 pt-4 border-t border-gray-100 flex gap-3">
+            <button onClick={limpiar}
+              className="px-4 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition">
+              Nuevo análisis
+            </button>
+            <button onClick={() => setPagina('historial')}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition">
+              <History size={15}/> Ver historial
+            </button>
+          </div>
         </div>
       )}
     </div>

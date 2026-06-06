@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import axios from 'axios'
+import api from '../api'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 
 const COLORS = ['#1e40af','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#be185d','#65a30d','#ea580c','#6366f1']
@@ -9,15 +9,13 @@ export default function Estadisticas() {
   const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
-    axios.get('http://127.0.0.1:5000/estadisticas')
+    api.get('/api/estadisticas')
       .then(res => { setDatos(res.data); setCargando(false) })
       .catch(() => setCargando(false))
   }, [])
 
   if (cargando) return (
-    <div className="flex items-center justify-center h-64 text-gray-500">
-      Cargando estadísticas...
-    </div>
+    <div className="flex items-center justify-center h-64 text-gray-500">Cargando estadísticas...</div>
   )
 
   if (!datos) return (
@@ -36,54 +34,52 @@ export default function Estadisticas() {
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Estadísticas del Dataset</h1>
 
-      {/* Total */}
-      <div className="bg-white rounded-xl shadow p-5 mb-6 flex items-center gap-4">
-        <div className="bg-blue-800 text-white px-6 py-4 rounded-lg text-center">
-          <p className="text-3xl font-bold">{datos.total.toLocaleString()}</p>
-          <p className="text-sm text-blue-200">CVs en el sistema</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white rounded-xl shadow p-5 flex items-center gap-4">
+          <div className="bg-blue-800 text-white px-5 py-4 rounded-lg text-center">
+            <p className="text-2xl font-bold">{datos.total.toLocaleString()}</p>
+            <p className="text-xs text-blue-200">CVs en dataset</p>
+          </div>
+          <p className="text-sm text-gray-600">Currículos reales usados para entrenar el modelo ML.</p>
         </div>
-        <div>
-          <p className="text-gray-700 font-medium">Dataset de entrenamiento</p>
-          <p className="text-gray-500 text-sm">
-            El modelo fue entrenado con {datos.total.toLocaleString()} currículos
-            distribuidos en {Object.keys(datos.por_categoria).length} categorías profesionales.
-          </p>
+        <div className="bg-white rounded-xl shadow p-5 flex items-center gap-4">
+          <div className="bg-purple-600 text-white px-5 py-4 rounded-lg text-center">
+            <p className="text-2xl font-bold">{Object.keys(datos.por_categoria).length}</p>
+            <p className="text-xs text-purple-200">Categorías</p>
+          </div>
+          <p className="text-sm text-gray-600">Categorías profesionales detectadas por el modelo.</p>
+        </div>
+        <div className="bg-white rounded-xl shadow p-5 flex items-center gap-4">
+          <div className="bg-green-600 text-white px-5 py-4 rounded-lg text-center">
+            <p className="text-2xl font-bold">{(datos.total_analizados ?? 0).toLocaleString()}</p>
+            <p className="text-xs text-green-200">Analizados</p>
+          </div>
+          <p className="text-sm text-gray-600">CVs analizados a través del sistema.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gráfica de barras */}
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-4">CVs por categoría</h2>
-          <ResponsiveContainer width="100%" height={350}>
+          <ResponsiveContainer width="100%" height={400}>
             <BarChart data={barData} layout="vertical" margin={{ left: 80 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis type="number" tick={{ fontSize: 11 }}/>
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={80}/>
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90}/>
               <Tooltip />
               <Bar dataKey="value" fill="#1e40af" radius={[0,4,4,0]}/>
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Gráfica de pastel */}
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-4">Top 10 categorías</h2>
-          <ResponsiveContainer width="100%" height={350}>
+          <ResponsiveContainer width="100%" height={400}>
             <PieChart>
-              <Pie
-                data={pieData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={110}
-                label={({ name, percent }) => `${(percent*100).toFixed(0)}%`}
-                labelLine={false}
-              >
-                {pieData.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]}/>
-                ))}
+              <Pie data={pieData} dataKey="value" nameKey="name"
+                cx="50%" cy="50%" outerRadius={120}
+                label={({ name, percent }) => `${(percent*100).toFixed(0)}%`} labelLine={false}>
+                {pieData.map((_, i) => (<Cell key={i} fill={COLORS[i % COLORS.length]}/>))}
               </Pie>
               <Legend formatter={v => <span style={{fontSize:11}}>{v}</span>}/>
               <Tooltip />
@@ -92,7 +88,6 @@ export default function Estadisticas() {
         </div>
       </div>
 
-      {/* Tabla */}
       <div className="bg-white rounded-xl shadow p-6 mt-6">
         <h2 className="text-lg font-bold text-gray-800 mb-4">Detalle por categoría</h2>
         <div className="overflow-x-auto">
@@ -113,14 +108,11 @@ export default function Estadisticas() {
                   <td className="p-3 text-gray-600">{row.value}</td>
                   <td className="p-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-24 bg-gray-200 rounded-full h-2">
-                        <div
-                          className="h-2 rounded-full"
-                          style={{
-                            width: `${(row.value/datos.total*100).toFixed(0)}%`,
-                            backgroundColor: COLORS[i % COLORS.length]
-                          }}
-                        />
+                      <div className="w-32 bg-gray-200 rounded-full h-2">
+                        <div className="h-2 rounded-full" style={{
+                          width: `${(row.value/datos.total*100).toFixed(0)}%`,
+                          backgroundColor: COLORS[i % COLORS.length]
+                        }}/>
                       </div>
                       <span className="text-gray-500">{(row.value/datos.total*100).toFixed(1)}%</span>
                     </div>
