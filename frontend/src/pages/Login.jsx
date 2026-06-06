@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../AuthContext'
 import api from '../api'
-import { LogIn, AlertCircle, Eye, EyeOff, UserPlus, ArrowLeft, User, Mail, Lock, Building, Sparkles } from 'lucide-react'
-
-const PARTICLE_COUNT = 50
+import { LogIn, AlertCircle, Eye, EyeOff, UserPlus, User, Mail, Lock, Building, Sparkles } from 'lucide-react'
 
 export default function Login() {
   const { login } = useAuth()
@@ -20,33 +18,9 @@ export default function Login() {
   const [regCargando, setRegCargando] = useState(false)
   const [regShowPass, setRegShowPass] = useState(false)
 
-  const [particles, setParticles] = useState([])
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
-
-  useEffect(() => {
-    const arr = Array.from({ length: PARTICLE_COUNT }, (_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 4 + 1,
-      speedX: (Math.random() - 0.5) * 0.15,
-      speedY: (Math.random() - 0.5) * 0.15,
-      opacity: Math.random() * 0.5 + 0.1,
-    }))
-    setParticles(arr)
-
-    const interval = setInterval(() => {
-      setParticles(prev => prev.map(p => ({
-        ...p,
-        x: (p.x + p.speedX + 100) % 100,
-        y: (p.y + p.speedY + 100) % 100,
-      })))
-    }, 50)
-
-    const handleMouse = (e) => setMousePos({ x: e.clientX, y: e.clientY })
-    window.addEventListener('mousemove', handleMouse)
-    return () => { clearInterval(interval); window.removeEventListener('mousemove', handleMouse) }
-  }, [])
+  const irAlLogin = () => {
+    setTimeout(() => window.location.replace('/'), 200)
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -54,9 +28,8 @@ export default function Login() {
       setError('Ingresa usuario y contraseña'); return
     }
     setError(''); setCargando(true)
-    try { await login(username, password) }
-    catch { setError('Usuario o contraseña incorrectos') }
-    finally { setCargando(false) }
+    try { await login(username, password); irAlLogin() }
+    catch { setError('Usuario o contraseña incorrectos'); setCargando(false) }
   }
 
   const handleRegister = async (e) => {
@@ -67,41 +40,33 @@ export default function Login() {
     setRegError(''); setRegExito(''); setRegCargando(true)
     try {
       await api.post('/api/register', regForm)
-      setRegExito('Registro exitoso. Redirigiendo...')
-      setRegForm({ username: '', email: '', password: '', full_name: '' })
-      setTimeout(() => setModo('login'), 2000)
+      await login(regForm.username, regForm.password)
+      irAlLogin()
     } catch (err) {
-      setRegError(err.response?.data?.error || 'Error al registrarse')
+      if (err.response?.status === 409) {
+        try {
+          await login(regForm.username, regForm.password)
+          irAlLogin()
+        } catch {
+          setRegError('Ese usuario ya existe. Intentá con otro nombre.')
+        }
+      } else {
+        setRegError(err.response?.data?.error || 'Error al registrarse')
+      }
     } finally { setRegCargando(false) }
   }
 
-  const gradFrom = modo === 'login' ? 'indigo' : 'emerald'
-  const gradTo = modo === 'login' ? 'violet' : 'teal'
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950 relative overflow-hidden selection:bg-white/20">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.08)_0%,transparent_60%),radial-gradient(ellipse_at_bottom,rgba(139,92,246,0.05)_0%,transparent_60%)]"/>
-
-      {particles.map(p => (
-        <div key={p.id} className="absolute rounded-full pointer-events-none"
-          style={{
-            left: `${p.x}%`,
-            top: `${p.y}%`,
-            width: `${p.size}px`,
-            height: `${p.size}px`,
-            opacity: p.opacity,
-            background: modo === 'login'
-              ? `radial-gradient(circle, rgba(99,102,241,${p.opacity}), transparent)`
-              : `radial-gradient(circle, rgba(52,211,153,${p.opacity}), transparent)`,
-            boxShadow: `0 0 ${p.size * 2}px ${modo === 'login' ? 'rgba(99,102,241,0.15)' : 'rgba(52,211,153,0.15)'}`,
-            transition: 'left 0.05s linear, top 0.05s linear',
-          }}
-        />
-      ))}
-
       <div className="absolute inset-0"
         style={{
-          background: `radial-gradient(600px circle at ${mousePos.x}px ${mousePos.y}px, ${modo === 'login' ? 'rgba(99,102,241,0.03)' : 'rgba(52,211,153,0.03)'}, transparent 40%)`,
+          background: 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.12), transparent), radial-gradient(ellipse 60% 40% at 30% 120%, rgba(139,92,246,0.08), transparent), radial-gradient(ellipse 50% 30% at 70% 110%, rgba(99,102,241,0.06), transparent)',
+        }}
+      />
+      <div className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
+          backgroundSize: '40px 40px',
         }}
       />
 
@@ -115,11 +80,9 @@ export default function Login() {
         </div>
 
         <div className="relative">
-          <div className={`absolute -inset-1 bg-gradient-to-r from-${gradFrom}-500/20 via-${gradFrom}-400/10 to-${gradTo}-500/20 rounded-2xl blur-xl transition-all duration-700`}/>
+          <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 via-indigo-400/10 to-violet-500/20 rounded-2xl blur-xl"/>
 
           <div className="relative bg-gray-900/80 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/10 ring-1 ring-white/5">
-
-            {/* Tabs */}
             <div className="flex mb-8 bg-gray-800/50 rounded-xl p-1 border border-white/5">
               <button onClick={() => setModo('login')}
                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${modo === 'login' ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-lg shadow-indigo-500/20' : 'text-white/40 hover:text-white/70'}`}>
@@ -135,25 +98,23 @@ export default function Login() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-white/50 uppercase tracking-wider mb-1.5">Usuario</label>
-                  <div className="relative group">
-                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-violet-500/10 rounded-xl opacity-0 group-focus-within:opacity-100 transition-opacity"/>
-                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-indigo-400 transition-colors z-10"/>
+                  <div className="relative">
+                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 peer-focus-within:text-indigo-400 transition-colors"/>
                     <input type="text" value={username} onChange={e => setUsername(e.target.value)}
-                      className="relative w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/25 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+                      className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/25 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 transition-all peer"
                       placeholder="Ingresa tu usuario"/>
                   </div>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-white/50 uppercase tracking-wider mb-1.5">Contraseña</label>
-                  <div className="relative group">
-                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-violet-500/10 rounded-xl opacity-0 group-focus-within:opacity-100 transition-opacity"/>
-                    <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-indigo-400 transition-colors z-10"/>
+                  <div className="relative">
+                    <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 peer-focus-within:text-indigo-400 transition-colors"/>
                     <input type={showPass ? 'text' : 'password'} value={password}
                       onChange={e => setPassword(e.target.value)}
-                      className="relative w-full pl-10 pr-10 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/25 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+                      className="w-full pl-10 pr-10 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/25 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 transition-all peer"
                       placeholder="Ingresa tu contraseña"/>
                     <button type="button" onClick={() => setShowPass(!showPass)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors z-10">
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">
                       {showPass ? <EyeOff size={16}/> : <Eye size={16}/>}
                     </button>
                   </div>
@@ -166,8 +127,8 @@ export default function Login() {
                 )}
 
                 <button type="submit" disabled={cargando}
-                  className="relative w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400 text-white py-3 rounded-xl font-semibold transition-all disabled:opacity-50 shadow-lg shadow-indigo-500/20 overflow-hidden group">
-                  <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%)] bg-[length:250%_250%] group-hover:bg-[position:100%_100%] transition-all duration-700"/>
+                  className="relative w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400 text-white py-3 rounded-xl font-semibold transition-all disabled:opacity-50 shadow-lg shadow-indigo-500/20 overflow-hidden">
+                  <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%)] bg-[length:250%_250%] hover:bg-[position:100%_100%] transition-all duration-700"/>
                   {cargando ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
                   ) : (
@@ -179,46 +140,43 @@ export default function Login() {
               <form onSubmit={handleRegister} className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-white/50 uppercase tracking-wider mb-1.5">Nombre completo</label>
-                  <div className="relative group">
-                    <Building size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-emerald-400 transition-colors z-10"/>
-                    <input type="text" value={regForm.full_name}
-                      onChange={e => setRegForm({...regForm, full_name: e.target.value})}
-                      className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/25 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all"
-                      placeholder="Ej: Juan Pérez"/>
-                  </div>
+                  <input type="text" value={regForm.full_name}
+                    onChange={e => setRegForm({...regForm, full_name: e.target.value})}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/25 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all"
+                    placeholder="Ej: Juan Pérez"/>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-white/50 uppercase tracking-wider mb-1.5">Usuario *</label>
-                    <div className="relative group">
-                      <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-emerald-400 transition-colors z-10"/>
+                    <div className="relative">
+                      <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"/>
                       <input type="text" value={regForm.username}
                         onChange={e => setRegForm({...regForm, username: e.target.value})} required
-                        className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/25 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all"
+                        className="w-full pl-9 pr-3 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/25 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all text-sm"
                         placeholder="Usuario"/>
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-white/50 uppercase tracking-wider mb-1.5">Email *</label>
-                    <div className="relative group">
-                      <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-emerald-400 transition-colors z-10"/>
+                    <div className="relative">
+                      <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"/>
                       <input type="email" value={regForm.email}
                         onChange={e => setRegForm({...regForm, email: e.target.value})} required
-                        className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/25 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all"
+                        className="w-full pl-9 pr-3 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/25 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all text-sm"
                         placeholder="tu@email.com"/>
                     </div>
                   </div>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-white/50 uppercase tracking-wider mb-1.5">Contraseña *</label>
-                  <div className="relative group">
-                    <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-emerald-400 transition-colors z-10"/>
+                  <div className="relative">
+                    <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30"/>
                     <input type={regShowPass ? 'text' : 'password'} value={regForm.password}
                       onChange={e => setRegForm({...regForm, password: e.target.value})} required
                       className="w-full pl-10 pr-10 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/25 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 transition-all"
                       placeholder="Crea una contraseña segura"/>
                     <button type="button" onClick={() => setRegShowPass(!regShowPass)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors z-10">
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">
                       {regShowPass ? <EyeOff size={16}/> : <Eye size={16}/>}
                     </button>
                   </div>
@@ -237,8 +195,8 @@ export default function Login() {
                 )}
 
                 <button type="submit" disabled={regCargando}
-                  className="relative w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white py-3 rounded-xl font-semibold transition-all disabled:opacity-50 shadow-lg shadow-emerald-500/20 overflow-hidden group">
-                  <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%)] bg-[length:250%_250%] group-hover:bg-[position:100%_100%] transition-all duration-700"/>
+                  className="relative w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white py-3 rounded-xl font-semibold transition-all disabled:opacity-50 shadow-lg shadow-emerald-500/20 overflow-hidden">
+                  <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%)] bg-[length:250%_250%] hover:bg-[position:100%_100%] transition-all duration-700"/>
                   {regCargando ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
                   ) : (
@@ -248,19 +206,18 @@ export default function Login() {
               </form>
             )}
 
-            {/* Credenciales de prueba */}
             {modo === 'login' && (
               <div className="mt-6 pt-6 border-t border-white/5">
                 <p className="text-xs text-white/30 text-center mb-3 uppercase tracking-wider">Acceso rápido</p>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { rol: 'Administrador', user: 'admin', pass: 'admin123', from: 'from-indigo-500/10', to: 'to-violet-500/10', border: 'border-indigo-500/20' },
-                    { rol: 'Analista RRHH', user: 'analista', pass: 'analista123', from: 'from-emerald-500/10', to: 'to-teal-500/10', border: 'border-emerald-500/20' },
+                    { rol: 'Administrador', user: 'admin', pass: 'admin123', cls: 'from-indigo-500/10 to-violet-500/10 border-indigo-500/20' },
+                    { rol: 'Analista RRHH', user: 'analista', pass: 'analista123', cls: 'from-emerald-500/10 to-teal-500/10 border-emerald-500/20' },
                   ].map((item, i) => (
                     <button key={i} type="button" onClick={() => { setUsername(item.user); setPassword(item.pass) }}
-                      className={`bg-gradient-to-br ${item.from} ${item.to} ${item.border} rounded-xl p-3.5 text-center hover:scale-[1.02] hover:bg-white/5 transition-all cursor-pointer group`}>
+                      className={`bg-gradient-to-br ${item.cls} border rounded-xl p-3.5 text-center hover:scale-[1.02] hover:bg-white/5 transition-all cursor-pointer`}>
                       <p className="text-white/70 font-medium text-xs tracking-wide">{item.rol}</p>
-                      <p className="text-white/25 text-[10px] mt-1 font-mono group-hover:text-white/40 transition-colors">{item.user} / {item.pass}</p>
+                      <p className="text-white/25 text-[10px] mt-1 font-mono">{item.user} / {item.pass}</p>
                     </button>
                   ))}
                 </div>
